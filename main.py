@@ -89,10 +89,15 @@ async def analyze_image(
     try:
         print(f"Starting analysis for user: {user_id}")
 
-        # Validate image
-        if not image.content_type.startswith('image/'):
+        # Validate image - accept both proper image types and octet-stream (common from mobile apps)
+        valid_content_types = ['image/', 'application/octet-stream']
+        is_valid_type = any(image.content_type.startswith(ct) for ct in valid_content_types)
+
+        if not is_valid_type:
             print(f"Invalid image type: {image.content_type}")
             raise HTTPException(status_code=400, detail="File must be an image")
+
+        print(f"Accepted image type: {image.content_type}")
 
         # Generate unique ID for this analysis
         analysis_id = str(uuid.uuid4())
