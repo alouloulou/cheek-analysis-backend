@@ -28,35 +28,27 @@ async def get_user_profile(user_id: str) -> Dict[str, Any]:
         
         if response.data:
             profile = response.data
-            print(f"Retrieved profile data: {profile}")
-
-            # Calculate derived values from real user data
-            diet_quality = profile.get('diet_quality')
-            hydration = f"{diet_quality * 0.3 + 1.5:.1f}L" if diet_quality else "2.5L"  # 1.5-4.5L based on diet quality
-            sugar_score = 10 - diet_quality if diet_quality else 5
-
-            # Format user data for AI analysis using REAL data from database
+            
+            # Format user data for AI analysis
             user_data = {
                 "user_lifestyle_information": {
-                    "age": profile.get('age'),
-                    "sex": profile.get('gender'),
-                    "ethnicity": profile.get('ethnicity'),
-                    "hydration": hydration,
-                    "sleep_quality": f"{profile.get('sleep_hours')} hours" if profile.get('sleep_hours') else None,
-                    "physical_activity": profile.get('exercise_frequency'),
-                    "posture": f"{profile.get('stress_level')} for 0=Very poor - 10=Excellent" if profile.get('stress_level') else None,
-                    "smoking_alcohol": f"{profile.get('smoking_habits', 'no smoking')} {profile.get('alcohol_consumption', 'no alcohol')}",
-                    "sun_exposure": profile.get('sun_exposure'),
-                    "protein_intake": profile.get('protein_intake'),
-                    "collagen_vitamin_C": profile.get('collagen_vitamin_c'),
-                    "sugar_processed_food": f"{sugar_score} for 0=Very high intake - 10=Very low intake",
-                    "facial_exercises": profile.get('facial_exercises'),
+                    "age": profile.get('age', 25),
+                    "sex": profile.get('gender', 'Unknown'),
+                    "ethnicity": profile.get('ethnicity', 'Unknown'),
+                    "hydration": f"{profile.get('diet_quality', 5)}L" if profile.get('diet_quality') else "2.5L",
+                    "sleep_quality": f"{profile.get('sleep_hours', 7)} hours",
+                    "physical_activity": profile.get('exercise_frequency', '3 times a week'),
+                    "posture": f"{profile.get('stress_level', 5)} for 0=Very poor - 10=Excellent",
+                    "smoking_alcohol": profile.get('smoking_habits', 'no smoking') + " " + profile.get('alcohol_consumption', 'no alcohol'),
+                    "sun_exposure": "10 mins a day",  # Default value
+                    "protein_intake": "moderate",  # Default value
+                    "collagen_vitamin_C": "moderate",  # Default value
+                    "sugar_processed_food": f"{10 - profile.get('diet_quality', 5)} for 0=Very high intake - 10=Very low intake",
+                    "facial_exercises": profile.get('facial_exercises', 'none'),
                     "massage_skincare": "yes" if profile.get('massage_skincare', 0) > 5 else "no",
-                    "weight_changes": profile.get('weight_changes')
+                    "weight_changes": f"{profile.get('age', 25) * 2.5}Kg"  # Estimated weight
                 }
             }
-
-            print(f"Formatted user data for AI: {user_data}")
             
             return user_data
         else:
