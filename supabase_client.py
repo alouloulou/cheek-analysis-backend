@@ -13,16 +13,18 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 async def get_user_profile(user_id: str) -> Dict[str, Any]:
     """
     Get user profile data from Supabase for personalized recommendations
-    
+
     Args:
         user_id: The user's UUID
-        
+
     Returns:
         Dict containing user profile data
     """
     try:
+        print(f"Getting user profile for: {user_id}")
         # Get user profile from profiles table
         response = supabase.table('profiles').select('*').eq('id', user_id).single().execute()
+        print(f"Supabase response: {response}")
         
         if response.data:
             profile = response.data
@@ -107,8 +109,10 @@ async def save_analysis_to_supabase(analysis_result: Dict[str, Any]) -> bool:
         }
         
         # Insert into user_analyses table
+        print(f"Inserting analysis data: {analysis_data}")
         response = supabase.table('user_analyses').insert(analysis_data).execute()
-        
+        print(f"Insert response: {response}")
+
         if response.data:
             print(f"Analysis saved successfully for user {analysis_result['user_id']}")
             return True

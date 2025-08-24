@@ -40,6 +40,43 @@ async def root():
 async def health_check():
     return {"status": "healthy", "service": "cheek-analysis-backend"}
 
+@app.post("/test-analyze")
+async def test_analyze():
+    """Test endpoint to check if analysis pipeline works without image upload"""
+    try:
+        print("Testing analysis pipeline...")
+
+        # Test user data retrieval
+        user_data = await get_user_data_from_supabase("test-user-id")
+        print(f"User data test: {user_data}")
+
+        # Test with mock metrics
+        mock_metrics = {
+            "cheek_lift": 6.2,
+            "cheek_fullness": 7.1,
+            "smile_symmetry": 6.8,
+            "muscle_tone": 6.5,
+            "elasticity_sagging": 6.9,
+            "fat_vs_muscle_contribution": "60% muscle / 40% fat"
+        }
+
+        # Test improvement plan generation
+        improvement_plan = await generate_improvement_plan(mock_metrics, user_data)
+        print(f"Improvement plan test: {improvement_plan}")
+
+        return {
+            "status": "success",
+            "user_data": user_data,
+            "mock_metrics": mock_metrics,
+            "improvement_plan": improvement_plan
+        }
+
+    except Exception as e:
+        print(f"Test error: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return {"status": "error", "message": str(e)}
+
 @app.post("/analyze")
 async def analyze_image(
     user_id: str = Form(...),
@@ -47,48 +84,51 @@ async def analyze_image(
 ):
     """
     Analyze uploaded image and return cheek metrics + improvement plan
-    
-    Flow:
-    1. Save image temporarily 
-    2. Generate temporary URL for AI access
-    3. Get user data from Supabase
-    4. Analyze image with AI
-    5. Generate improvement plan
-    6. Save results to Supabase
-    7. Clean up temporary files
-    8. Return results
     """
+    analysis_id = None
     try:
+        print(f"Starting analysis for user: {user_id}")
+
         # Validate image
         if not image.content_type.startswith('image/'):
+            print(f"Invalid image type: {image.content_type}")
             raise HTTPException(status_code=400, detail="File must be an image")
-        
+
         # Generate unique ID for this analysis
         analysis_id = str(uuid.uuid4())
-        
+        print(f"Generated analysis ID: {analysis_id}")
+
         # Save image temporarily
         file_extension = image.filename.split('.')[-1] if '.' in image.filename else 'jpg'
         temp_filename = f"{analysis_id}.{file_extension}"
         temp_filepath = TEMP_DIR / temp_filename
-        
+
         # Write uploaded file to temporary location
         with open(temp_filepath, "wb") as buffer:
             content = await image.read()
             buffer.write(content)
-        
+        print(f"Saved temporary image: {temp_filepath}")
+
         # Create temporary URL for AI access
-        temp_url = f"http://localhost:8000/temp-image/{analysis_id}"
+        temp_url = f"https://cheek-analysis-backend.onrender.com/temp-image/{analysis_id}"
         temp_image_store[analysis_id] = str(temp_filepath)
-        
+        print(f"Created temp URL: {temp_url}")
+
         # Get user data from Supabase (for personalized recommendations)
+        print("Getting user data from Supabase...")
         user_data = await get_user_data_from_supabase(user_id)
-        
+        print(f"User data retrieved: {user_data}")
+
         # Analyze image with AI
+        print("Starting AI analysis...")
         cheek_metrics = await analyze_cheek_metrics(temp_url)
-        
+        print(f"AI analysis complete: {cheek_metrics}")
+
         # Generate personalized improvement plan
+        print("Generating improvement plan...")
         improvement_plan = await generate_improvement_plan(cheek_metrics, user_data)
-        
+        print("Improvement plan generated")
+
         # Prepare results
         analysis_result = {
             "analysis_id": analysis_id,
@@ -98,20 +138,28 @@ async def analyze_image(
             "improvement_plan": improvement_plan,
             "status": "completed"
         }
-        
+
         # Save to Supabase
+        print("Saving to Supabase...")
         await save_analysis_to_supabase(analysis_result)
-        
+        print("Saved to Supabase successfully")
+
         # Clean up temporary file
         cleanup_temp_file(analysis_id)
-        
+        print("Analysis completed successfully")
+
         return analysis_result
-        
+
     except Exception as e:
+        print(f"Error in analysis: {str(e)}")
+        print(f"Error type: {type(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+
         # Clean up on error
-        if 'analysis_id' in locals():
+        if analysis_id:
             cleanup_temp_file(analysis_id)
-        
+
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 @app.get("/temp-image/{image_id}")

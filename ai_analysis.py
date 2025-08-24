@@ -18,14 +18,28 @@ client = ChatCompletionsClient(
 async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
     """
     Analyze cheek metrics from image using Azure AI
-    
+
     Args:
         image_url: URL to the temporary image
-        
+
     Returns:
         Dict containing cheek analysis metrics
     """
-    
+
+    print(f"Starting cheek analysis for image: {image_url}")
+
+    # Check if Azure AI token is available
+    if TOKEN == "your-token-here":
+        print("WARNING: Azure AI token not set, using fallback metrics")
+        return {
+            "cheek_lift": 6.2,
+            "cheek_fullness": 7.1,
+            "smile_symmetry": 6.8,
+            "muscle_tone": 6.5,
+            "elasticity_sagging": 6.9,
+            "fat_vs_muscle_contribution": "60% muscle / 40% fat"
+        }
+
     prompt = (
         "You are a facial aesthetics analysis AI. Analyze the provided selfie image and output scientifically-informed metrics "
         "related specifically to the cheeks. Metrics must be quantitative or scaled wherever possible, following approaches "
@@ -49,6 +63,7 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
     )
     
     try:
+        print("Calling Azure AI API...")
         response = client.complete(
             messages=[
                 SystemMessage(prompt),
@@ -74,27 +89,33 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
             top_p=1,
             model=MODEL
         )
-        
+
         result = response.choices[0].message.content
-        
+        print(f"AI response received: {result[:200]}...")
+
         # Parse JSON response
         try:
             metrics = json.loads(result)
+            print(f"Parsed metrics: {metrics}")
             return metrics
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as je:
+            print(f"JSON decode error: {je}")
             # If response isn't valid JSON, try to extract JSON from text
             import re
             json_match = re.search(r'\{.*\}', result, re.DOTALL)
             if json_match:
                 metrics = json.loads(json_match.group())
+                print(f"Extracted metrics: {metrics}")
                 return metrics
             else:
+                print("Could not extract JSON from AI response")
                 raise Exception("Could not parse AI response as JSON")
-                
+
     except Exception as e:
         print(f"Error in cheek analysis: {e}")
+        print(f"Error type: {type(e)}")
         # Return fallback metrics
-        return {
+        fallback_metrics = {
             "cheek_lift": 6.0,
             "cheek_fullness": 6.5,
             "smile_symmetry": 7.0,
@@ -102,18 +123,47 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
             "elasticity_sagging": 6.2,
             "fat_vs_muscle_contribution": "55% muscle / 45% fat"
         }
+        print(f"Using fallback metrics: {fallback_metrics}")
+        return fallback_metrics
 
 async def generate_improvement_plan(cheek_metrics: Dict[str, Any], user_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Generate personalized improvement plan based on cheek metrics and user data
-    
+
     Args:
         cheek_metrics: Results from cheek analysis
         user_data: User profile data from Supabase
-        
+
     Returns:
         Dict containing personalized improvement plan
     """
+
+    print("Starting improvement plan generation...")
+
+    # Check if Azure AI token is available
+    if TOKEN == "your-token-here":
+        print("WARNING: Azure AI token not set, using fallback plan")
+        return {
+            "cheek_improvement_plan": {
+                "title": "Cheek Improvement Plan",
+                "description": "A personalized plan to enhance your cheek appearance through evidence-based exercises and lifestyle recommendations.",
+                "steps": [
+                    {
+                        "category": "Facial Exercises",
+                        "goal": "Improve cheek muscle tone and lift",
+                        "exercises": [
+                            {
+                                "name": "Cheek Lift Exercise",
+                                "description": "Strengthens and lifts the upper cheeks by smiling while raising the cheeks toward the eyes.",
+                                "reps": "12-15",
+                                "duration": "8 seconds hold per rep",
+                                "frequency_per_week": "5"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
     
     prompt_2 = f"""
 You are an AI assistant that creates **personalized, science-backed cheek improvement plans**.
