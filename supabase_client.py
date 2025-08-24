@@ -82,15 +82,15 @@ def get_default_user_data() -> Dict[str, Any]:
 async def save_analysis_to_supabase(analysis_result: Dict[str, Any]) -> bool:
     """
     Save analysis results to Supabase
-    
+
     Args:
         analysis_result: Complete analysis result including metrics and plan
-        
+
     Returns:
         bool: True if successful, False otherwise
     """
     try:
-        # Prepare data for user_analyses table
+        # Prepare data for user_analyses table (matching actual schema)
         analysis_data = {
             "user_id": analysis_result["user_id"],
             "analysis_data": analysis_result["cheek_metrics"],
@@ -99,8 +99,11 @@ async def save_analysis_to_supabase(analysis_result: Dict[str, Any]) -> bool:
                 "overall_score": calculate_overall_score(analysis_result["cheek_metrics"]),
                 "improvement_potential": calculate_improvement_potential(analysis_result["cheek_metrics"])
             },
-            "created_at": analysis_result["timestamp"],
-            "updated_at": analysis_result["timestamp"]
+            "analysis_date": analysis_result["timestamp"],
+            "photo_url": None,  # We're not storing photos in Supabase anymore
+            "photo_path": None,
+            "device_info": {"platform": "mobile_app"},
+            "app_version": "1.0.0"
         }
         
         # Insert into user_analyses table
