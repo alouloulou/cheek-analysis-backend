@@ -190,6 +190,8 @@ async def generate_improvement_plan(cheek_metrics: Dict[str, Any], user_data: Di
     # Convert data to strings to avoid json.dumps() issues
     cheek_metrics_str = str(cheek_metrics) if cheek_metrics else "No metrics available"
     user_data_str = str(user_data) if user_data else "No user data available"
+    print('*************   cheek_metrics_str', cheek_metrics_str)
+    print('*************user_data_str', user_data_str)
 
     # Check if Azure AI token is available
     if TOKEN == "your-token-here":
