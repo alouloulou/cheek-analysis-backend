@@ -2,7 +2,7 @@ import json
 import os
 from typing import Dict, Any
 from azure.ai.inference import ChatCompletionsClient
-from azure.ai.inference.models import SystemMessage, UserMessage
+from azure.ai.inference.models import SystemMessage, UserMessage, TextContentItem, ImageContentItem, ImageUrl
 from azure.core.credentials import AzureKeyCredential
 
 # Azure AI configuration
@@ -75,22 +75,23 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
         system_msg = SystemMessage(prompt)
         print("DEBUG: SystemMessage created successfully")
         
-        # Create UserMessage with image - try different structure
-        user_content = [
+        user_msg = UserMessage([
             {
                 "type": "text",
-                "text": "Analyze this selfie/image and output the cheek metrics in JSON exactly as defined in the system prompt. You must compute real values for each metric based on the image analysis. Do NOT leave zeros, nulls, or placeholders. Output strictly JSON with the calculated numbers and percentages, no extra commentary."
+                "text": (
+                    "Analyze this selfie/image and output the cheek metrics in JSON exactly as defined in the system prompt. "
+                    "You must compute real values for each metric based on the image analysis. "
+                    "Do NOT leave zeros, nulls, or placeholders. "
+                    "Output strictly JSON with the calculated numbers and percentages, no extra commentary."
+                )
             },
             {
-                "type": "image_url", 
-                "image_url": {"url": str(image_url)}
+                "type": "image_url",
+                "image_url": {
+                    "url": image_url
+                }
             }
-        ]
-        
-        print(f"DEBUG: user_content structure: {type(user_content)}")
-        print(f"DEBUG: image_url value: {image_url}")
-        
-        user_msg = UserMessage(content=user_content)
+        ])
         print("DEBUG: UserMessage created successfully")
         
         response = client.complete(
@@ -382,6 +383,21 @@ Instructions:
         print("DEBUG: SystemMessage for improvement plan created successfully")
         
         user_msg_2 = UserMessage([
+            {
+                "type": "text",
+                "text": (
+                    "Generate a personalized, science-backed cheek improvement plan in JSON using the provided cheek metrics and user info. "
+                    "Include title, description, and steps with categories, goals, and evidence-based exercises or recommendations. "
+                    "Do not leave any fields blank. Only include scientifically supported methods. Output strictly valid JSON."
+                )
+            }
+        ])
+        print("DEBUG: UserMessage for improvement plan created successfully")
+        
+        response_2 = client.complete(
+            messages=[
+                SystemMessage(prompt_2),
+                UserMessage([
                     {
                         "type": "text",
                         "text": (
@@ -391,10 +407,7 @@ Instructions:
                         )
                     }
                 ])
-        print("DEBUG: UserMessage for improvement plan created successfully")
-        
-        response_2 = client.complete(
-            messages=[system_msg_2, user_msg_2],
+            ],
             temperature=0,
             top_p=1,
             model=MODEL
