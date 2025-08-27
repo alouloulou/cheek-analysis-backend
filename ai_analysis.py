@@ -161,42 +161,35 @@ async def generate_improvement_plan(cheek_metrics: Dict[str, Any], user_data: Di
     """
 
     print("Starting improvement plan generation...")
-    print(f"DEBUG: cheek_metrics type: {type(cheek_metrics)}, value: {cheek_metrics}")
-    print(f"DEBUG: user_data type: {type(user_data)}, value: {user_data}")
 
-    # TEMPORARY: Return fallback plan to isolate the error
-    print("TEMPORARY: Using fallback plan to isolate error")
-    return {
-        "cheek_improvement_plan": {
-            "title": "Cheek Improvement Plan",
-            "description": "A personalized plan to enhance your cheek appearance through evidence-based exercises and lifestyle recommendations.",
-            "steps": [
-                {
-                    "category": "Facial Exercises",
-                    "goal": "Improve cheek muscle tone and lift",
-                    "exercises": [
-                        {
-                            "name": "Cheek Lift Exercise",
-                            "description": "Strengthens and lifts the upper cheeks by smiling while raising the cheeks toward the eyes.",
-                            "reps": "12-15",
-                            "duration": "8 seconds hold per rep",
-                            "frequency_per_week": "5"
-                        }
-                    ]
-                }
-            ]
+    # Check if Azure AI token is available
+    if TOKEN == "your-token-here":
+        print("WARNING: Azure AI token not set, using fallback plan")
+        return {
+            "cheek_improvement_plan": {
+                "title": "Cheek Improvement Plan",
+                "description": "A personalized plan to enhance your cheek appearance through evidence-based exercises and lifestyle recommendations.",
+                "steps": [
+                    {
+                        "category": "Facial Exercises",
+                        "goal": "Improve cheek muscle tone and lift",
+                        "exercises": [
+                            {
+                                "name": "Cheek Lift Exercise",
+                                "description": "Strengthens and lifts the upper cheeks by smiling while raising the cheeks toward the eyes.",
+                                "reps": "12-15",
+                                "duration": "8 seconds hold per rep",
+                                "frequency_per_week": "5"
+                            }
+                        ]
+                    }
+                ]
+            }
         }
-    }
 
-    # TODO: Re-enable AI improvement plan generation after fixing the error
-    # The rest of this function is temporarily disabled
-    return {
-        "cheek_improvement_plan": {
-            "title": "Fallback Plan", 
-            "description": "Temporary fallback while debugging",
-            "steps": []
-        }
-    }
+    # Convert data to strings to avoid json.dumps() issues
+    cheek_metrics_str = str(cheek_metrics) if cheek_metrics else "No metrics available"
+    user_data_str = str(user_data) if user_data else "No user data available"
 
     # Check if Azure AI token is available
     if TOKEN == "your-token-here":
@@ -223,30 +216,15 @@ async def generate_improvement_plan(cheek_metrics: Dict[str, Any], user_data: Di
             }
         }
     
-    # Ensure cheek_metrics and user_data are dictionaries before json.dumps
-    if isinstance(cheek_metrics, str):
-        try:
-            cheek_metrics = json.loads(cheek_metrics)
-        except json.JSONDecodeError:
-            print(f"Warning: cheek_metrics is a string but not valid JSON: {cheek_metrics}")
-            cheek_metrics = {}
-    
-    if isinstance(user_data, str):
-        try:
-            user_data = json.loads(user_data)
-        except json.JSONDecodeError:
-            print(f"Warning: user_data is a string but not valid JSON: {user_data}")
-            user_data = {}
-
     prompt_2 = f"""
 You are an AI assistant that creates **personalized, science-backed cheek improvement plans**.
 
 Input:
 
 1. Cheek metrics:
-{json.dumps(cheek_metrics, indent=2)}
+{cheek_metrics_str}
 2. User information:
-{json.dumps(user_data, indent=2)}
+{user_data_str}
 
 Task:
 
