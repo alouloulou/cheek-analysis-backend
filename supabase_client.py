@@ -4,11 +4,14 @@ from supabase import create_client, Client
 import json
 
 # Supabase configuration
-SUPABASE_URL = "https://ckgihnidyyvmuylhqqur.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrZ2lobmlkeXl2bXV5bGhxcXVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM2NDYwOTYsImV4cCI6MjA2OTIyMjA5Nn0.YODqZ9QXwQJWcNqYLn_yUA3KWsstluhKlQj6PYWZ3BI"
+#SUPABASE_URL = "https://ckgihnidyyvmuylhqqur.supabase.co"
+#SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrZ2lobmlkeXl2bXV5bGhxcXVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM2NDYwOTYsImV4cCI6MjA2OTIyMjA5Nn0.YODqZ9QXwQJWcNqYLn_yUA3KWsstluhKlQj6PYWZ3BI"
+
+SUPABASE_URL = os.getenv("SUPABASE_URL", "your-token-here")
+SERVICE_ROLE_KEY = os.getenv("SERVICE_ROLE_KEY", "your-token-here")
 
 # Create Supabase client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase: Client = create_client(SUPABASE_URL, SERVICE_ROLE_KEY)
 
 async def get_user_profile(user_id: str) -> Dict[str, Any]:
     """
