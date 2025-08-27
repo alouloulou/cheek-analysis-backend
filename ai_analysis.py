@@ -188,6 +188,16 @@ async def generate_improvement_plan(cheek_metrics: Dict[str, Any], user_data: Di
         }
     }
 
+    # TODO: Re-enable AI improvement plan generation after fixing the error
+    # The rest of this function is temporarily disabled
+    return {
+        "cheek_improvement_plan": {
+            "title": "Fallback Plan", 
+            "description": "Temporary fallback while debugging",
+            "steps": []
+        }
+    }
+
     # Check if Azure AI token is available
     if TOKEN == "your-token-here":
         print("WARNING: Azure AI token not set, using fallback plan")
