@@ -161,6 +161,32 @@ async def generate_improvement_plan(cheek_metrics: Dict[str, Any], user_data: Di
     """
 
     print("Starting improvement plan generation...")
+    print(f"DEBUG: cheek_metrics type: {type(cheek_metrics)}, value: {cheek_metrics}")
+    print(f"DEBUG: user_data type: {type(user_data)}, value: {user_data}")
+
+    # TEMPORARY: Return fallback plan to isolate the error
+    print("TEMPORARY: Using fallback plan to isolate error")
+    return {
+        "cheek_improvement_plan": {
+            "title": "Cheek Improvement Plan",
+            "description": "A personalized plan to enhance your cheek appearance through evidence-based exercises and lifestyle recommendations.",
+            "steps": [
+                {
+                    "category": "Facial Exercises",
+                    "goal": "Improve cheek muscle tone and lift",
+                    "exercises": [
+                        {
+                            "name": "Cheek Lift Exercise",
+                            "description": "Strengthens and lifts the upper cheeks by smiling while raising the cheeks toward the eyes.",
+                            "reps": "12-15",
+                            "duration": "8 seconds hold per rep",
+                            "frequency_per_week": "5"
+                        }
+                    ]
+                }
+            ]
+        }
+    }
 
     # Check if Azure AI token is available
     if TOKEN == "your-token-here":
@@ -352,6 +378,10 @@ Instructions:
 """
     
     try:
+        print("Calling Azure AI API for improvement plan...")
+        print(f"Cheek metrics type: {type(cheek_metrics)}")
+        print(f"User data type: {type(user_data)}")
+        
         response_2 = client.complete(
             messages=[
                 SystemMessage(prompt_2),
@@ -371,8 +401,16 @@ Instructions:
             model=MODEL
         )
         
-        result = response_2.choices[0].message.content
-        print(f"Improvement plan AI response: {result[:200]}...")
+        # Handle the response more carefully
+        print("Processing Azure AI response...")
+        try:
+            result = response_2.choices[0].message.content
+            print(f"Improvement plan AI response: {result[:200]}...")
+        except AttributeError as ae:
+            print(f"AttributeError accessing response content: {ae}")
+            print(f"Response type: {type(response_2)}")
+            print(f"Response: {response_2}")
+            raise Exception("Failed to access AI response content")
         
         # Ensure we have a string to work with
         if not isinstance(result, str):
