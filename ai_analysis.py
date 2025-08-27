@@ -98,10 +98,19 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
         result = response.choices[0].message.content
         print(f"AI response received: {result[:200]}...")
 
+        # Ensure we have a string to work with
+        if not isinstance(result, str):
+            print(f"Warning: AI response is not a string, type: {type(result)}")
+            result = str(result)
+
         # Parse JSON response
         try:
             metrics = json.loads(result)
             print(f"Parsed metrics: {metrics}")
+            # Ensure we return a dictionary
+            if not isinstance(metrics, dict):
+                print(f"Warning: Parsed result is not a dict, type: {type(metrics)}")
+                raise json.JSONDecodeError("Result is not a dictionary", result, 0)
             return metrics
         except json.JSONDecodeError as je:
             print(f"JSON decode error: {je}")
@@ -109,9 +118,17 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
             import re
             json_match = re.search(r'\{.*\}', result, re.DOTALL)
             if json_match:
-                metrics = json.loads(json_match.group())
-                print(f"Extracted metrics: {metrics}")
-                return metrics
+                try:
+                    metrics = json.loads(json_match.group())
+                    print(f"Extracted metrics: {metrics}")
+                    # Ensure we return a dictionary
+                    if not isinstance(metrics, dict):
+                        print(f"Warning: Extracted result is not a dict, type: {type(metrics)}")
+                        raise json.JSONDecodeError("Extracted result is not a dictionary", result, 0)
+                    return metrics
+                except json.JSONDecodeError:
+                    print("Could not parse extracted JSON")
+                    raise Exception("Could not parse AI response as JSON")
             else:
                 print("Could not extract JSON from AI response")
                 raise Exception("Could not parse AI response as JSON")
@@ -170,15 +187,30 @@ async def generate_improvement_plan(cheek_metrics: Dict[str, Any], user_data: Di
             }
         }
     
+    # Ensure cheek_metrics and user_data are dictionaries before json.dumps
+    if isinstance(cheek_metrics, str):
+        try:
+            cheek_metrics = json.loads(cheek_metrics)
+        except json.JSONDecodeError:
+            print(f"Warning: cheek_metrics is a string but not valid JSON: {cheek_metrics}")
+            cheek_metrics = {}
+    
+    if isinstance(user_data, str):
+        try:
+            user_data = json.loads(user_data)
+        except json.JSONDecodeError:
+            print(f"Warning: user_data is a string but not valid JSON: {user_data}")
+            user_data = {}
+
     prompt_2 = f"""
 You are an AI assistant that creates **personalized, science-backed cheek improvement plans**.
 
 Input:
 
 1. Cheek metrics:
-{json.dumps(cheek_metrics)}
+{json.dumps(cheek_metrics, indent=2)}
 2. User information:
-{json.dumps(user_data)}
+{json.dumps(user_data, indent=2)}
 
 Task:
 
@@ -340,19 +372,41 @@ Instructions:
         )
         
         result = response_2.choices[0].message.content
+        print(f"Improvement plan AI response: {result[:200]}...")
+        
+        # Ensure we have a string to work with
+        if not isinstance(result, str):
+            print(f"Warning: Improvement plan response is not a string, type: {type(result)}")
+            result = str(result)
         
         # Parse JSON response
         try:
             plan = json.loads(result)
+            print(f"Parsed improvement plan: {type(plan)}")
+            # Ensure we return a dictionary
+            if not isinstance(plan, dict):
+                print(f"Warning: Parsed improvement plan is not a dict, type: {type(plan)}")
+                raise json.JSONDecodeError("Result is not a dictionary", result, 0)
             return plan
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as je:
+            print(f"Improvement plan JSON decode error: {je}")
             # If response isn't valid JSON, try to extract JSON from text
             import re
             json_match = re.search(r'\{.*\}', result, re.DOTALL)
             if json_match:
-                plan = json.loads(json_match.group())
-                return plan
+                try:
+                    plan = json.loads(json_match.group())
+                    print(f"Extracted improvement plan: {type(plan)}")
+                    # Ensure we return a dictionary
+                    if not isinstance(plan, dict):
+                        print(f"Warning: Extracted improvement plan is not a dict, type: {type(plan)}")
+                        raise json.JSONDecodeError("Extracted result is not a dictionary", result, 0)
+                    return plan
+                except json.JSONDecodeError:
+                    print("Could not parse extracted improvement plan JSON")
+                    raise Exception("Could not parse improvement plan as JSON")
             else:
+                print("Could not extract JSON from improvement plan response")
                 raise Exception("Could not parse improvement plan as JSON")
                 
     except Exception as e:
