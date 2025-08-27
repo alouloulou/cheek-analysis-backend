@@ -213,6 +213,9 @@ async def upload_image_to_supabase(image_data: bytes, file_extension: str) -> Op
         Public URL of uploaded image or None if failed
     """
     try:
+        # Ensure bucket exists
+        await ensure_images_bucket_exists()
+        
         # Generate unique filename
         image_id = str(uuid.uuid4())
         filename = f"temp_analysis/{image_id}.{file_extension}"
@@ -238,6 +241,31 @@ async def upload_image_to_supabase(image_data: bytes, file_extension: str) -> Op
         print(f"Error uploading image to Supabase: {e}")
         return None
 
+async def ensure_images_bucket_exists():
+    """
+    Ensure the 'images' bucket exists, create it if it doesn't
+    """
+    try:
+        # Try to list buckets to check if 'images' exists
+        buckets = supabase.storage.list_buckets()
+        
+        bucket_exists = any(bucket['name'] == 'images' for bucket in buckets)
+        
+        if not bucket_exists:
+            print("Creating 'images' bucket...")
+            # Create the bucket
+            result = supabase.storage.create_bucket('images', {'public': True})
+            if result:
+                print("Successfully created 'images' bucket")
+            else:
+                print("Failed to create 'images' bucket")
+        else:
+            print("'images' bucket already exists")
+            
+    except Exception as e:
+        print(f"Error checking/creating bucket: {e}")
+        # Continue anyway - the upload will fail with a clear error if bucket doesn't exist
+
 async def delete_image_from_supabase(image_url: str) -> bool:
     """
     Delete image from Supabase Storage using its URL
@@ -252,7 +280,13 @@ async def delete_image_from_supabase(image_url: str) -> bool:
         # Extract filename from URL
         # URL format: https://[project].supabase.co/storage/v1/object/public/images/temp_analysis/[uuid].[ext]
         if "/images/" in image_url:
+            # Split by /images/ and get the path after it
             filename = image_url.split("/images/")[-1]
+            
+            # Remove any query parameters (everything after ?)
+            if "?" in filename:
+                filename = filename.split("?")[0]
+            
             print(f"Deleting image from Supabase Storage: {filename}")
             
             # Delete from Supabase Storage
