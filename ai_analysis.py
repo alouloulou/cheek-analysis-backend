@@ -10,6 +10,11 @@ ENDPOINT = "https://models.github.ai/inference"
 MODEL = "openai/gpt-4.1"
 TOKEN = os.getenv("AZURE_AI_TOKEN", "your-token-here")  # Set this in environment
 
+# Debug logging for environment variables
+print(f"DEBUG: AZURE_AI_TOKEN exists: {os.getenv('AZURE_AI_TOKEN') is not None}")
+print(f"DEBUG: TOKEN value starts with: {TOKEN[:10] if TOKEN != 'your-token-here' else 'DEFAULT_FALLBACK'}")
+print(f"DEBUG: All environment variables: {list(os.environ.keys())}")
+
 client = ChatCompletionsClient(
     endpoint=ENDPOINT,
     credential=AzureKeyCredential(TOKEN),
