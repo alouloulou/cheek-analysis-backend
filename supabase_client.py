@@ -2,10 +2,11 @@ import os
 from typing import Dict, Any, Optional
 from supabase import create_client, Client
 import json
+import uuid
+from datetime import datetime, timedelta
 
 # Supabase configuration
-#SUPABASE_URL = "https://ckgihnidyyvmuylhqqur.supabase.co"
-#SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrZ2lobmlkeXl2bXV5bGhxcXVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM2NDYwOTYsImV4cCI6MjA2OTIyMjA5Nn0.YODqZ9QXwQJWcNqYLn_yUA3KWsstluhKlQj6PYWZ3BI"
+
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "your-token-here")
 SERVICE_ROLE_KEY = os.getenv("SERVICE_ROLE_KEY", "your-token-here")
@@ -197,3 +198,120 @@ async def get_user_analyses(user_id: str, limit: int = 10) -> list:
     except Exception as e:
         print(f"Error fetching user analyses: {e}")
         return []
+
+# Image Storage Functions
+
+async def upload_image_to_supabase(image_data: bytes, file_extension: str) -> Optional[str]:
+    """
+    Upload image to Supabase Storage and return public URL
+    
+    Args:
+        image_data: Raw image bytes
+        file_extension: File extension (e.g., 'jpg', 'png')
+        
+    Returns:
+        Public URL of uploaded image or None if failed
+    """
+    try:
+        # Generate unique filename
+        image_id = str(uuid.uuid4())
+        filename = f"temp_analysis/{image_id}.{file_extension}"
+        
+        print(f"Uploading image to Supabase Storage: {filename}")
+        
+        # Upload to Supabase Storage bucket 'images'
+        response = supabase.storage.from_("images").upload(filename, image_data)
+        
+        if response:
+            print(f"Image uploaded successfully: {filename}")
+            
+            # Get public URL
+            public_url = supabase.storage.from_("images").get_public_url(filename)
+            print(f"Public URL: {public_url}")
+            
+            return public_url
+        else:
+            print(f"Failed to upload image: {response}")
+            return None
+            
+    except Exception as e:
+        print(f"Error uploading image to Supabase: {e}")
+        return None
+
+async def delete_image_from_supabase(image_url: str) -> bool:
+    """
+    Delete image from Supabase Storage using its URL
+    
+    Args:
+        image_url: Public URL of the image to delete
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Extract filename from URL
+        # URL format: https://[project].supabase.co/storage/v1/object/public/images/temp_analysis/[uuid].[ext]
+        if "/images/" in image_url:
+            filename = image_url.split("/images/")[-1]
+            print(f"Deleting image from Supabase Storage: {filename}")
+            
+            # Delete from Supabase Storage
+            response = supabase.storage.from_("images").remove([filename])
+            
+            if response:
+                print(f"Image deleted successfully: {filename}")
+                return True
+            else:
+                print(f"Failed to delete image: {response}")
+                return False
+        else:
+            print(f"Invalid image URL format: {image_url}")
+            return False
+            
+    except Exception as e:
+        print(f"Error deleting image from Supabase: {e}")
+        return False
+
+async def cleanup_old_temp_images() -> int:
+    """
+    Clean up temporary images older than 1 hour from Supabase Storage
+    
+    Returns:
+        Number of images cleaned up
+    """
+    try:
+        print("Starting cleanup of old temporary images")
+        
+        # List all files in temp_analysis folder
+        response = supabase.storage.from_("images").list("temp_analysis")
+        
+        if not response:
+            print("No files found in temp_analysis folder")
+            return 0
+            
+        files_to_delete = []
+        cutoff_time = datetime.now() - timedelta(hours=1)
+        
+        for file_info in response:
+            # Check if file is older than 1 hour
+            created_at = datetime.fromisoformat(file_info['created_at'].replace('Z', '+00:00'))
+            if created_at < cutoff_time:
+                files_to_delete.append(f"temp_analysis/{file_info['name']}")
+        
+        if files_to_delete:
+            print(f"Deleting {len(files_to_delete)} old temporary images")
+            delete_response = supabase.storage.from_("images").remove(files_to_delete)
+            
+            if delete_response:
+                print(f"Successfully cleaned up {len(files_to_delete)} old images")
+                return len(files_to_delete)
+            else:
+                print(f"Failed to delete old images: {delete_response}")
+                return 0
+        else:
+            print("No old images to clean up")
+            return 0
+            
+    except Exception as e:
+        print(f"Error during cleanup: {e}")
+        return 0
