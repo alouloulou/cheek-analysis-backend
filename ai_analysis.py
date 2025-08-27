@@ -69,21 +69,16 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
     
     try:
         print("Calling Azure AI API...")
-        print(f"DEBUG: About to create SystemMessage with prompt type: {type(prompt)}")
+        print(f"DEBUG: About to create UserMessage with prompt type: {type(prompt)}")
         print(f"DEBUG: About to create UserMessage with image_url type: {(image_url)}")
-        
-        system_msg = SystemMessage(prompt)
-        print("DEBUG: SystemMessage created successfully")
         
         user_msg = UserMessage([
             {
                 "type": "text",
-                "text": (
-                    "Analyze this selfie/image and output the cheek metrics in JSON exactly as defined in the system prompt. "
-                    "You must compute real values for each metric based on the image analysis. "
-                    "Do NOT leave zeros, nulls, or placeholders. "
-                    "Output strictly JSON with the calculated numbers and percentages, no extra commentary."
-                )
+                "text": prompt + "\n\nAnalyze this selfie/image and output the cheek metrics in JSON exactly as defined above. "
+                "You must compute real values for each metric based on the image analysis. "
+                "Do NOT leave zeros, nulls, or placeholders. "
+                "Output strictly JSON with the calculated numbers and percentages, no extra commentary."
             },
             {
                 "type": "image_url",
@@ -95,7 +90,7 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
         print("DEBUG: UserMessage created successfully")
         
         response = client.complete(
-            messages=[system_msg, user_msg],
+            messages=[user_msg],
             temperature=0,  # deterministic output for metrics
             top_p=1,
             model=MODEL
@@ -199,31 +194,6 @@ async def generate_improvement_plan(cheek_metrics: Dict[str, Any], user_data: Di
     print('*************   cheek_metrics_str', cheek_metrics_str)
     print('*************user_data_str', user_data_str)
 
-    # Check if Azure AI token is available
-    if TOKEN == "your-token-here":
-        print("WARNING: Azure AI token not set, using fallback plan")
-        return {
-            "cheek_improvement_plan": {
-                "title": "Cheek Improvement Plan",
-                "description": "A personalized plan to enhance your cheek appearance through evidence-based exercises and lifestyle recommendations.",
-                "steps": [
-                    {
-                        "category": "Facial Exercises",
-                        "goal": "Improve cheek muscle tone and lift",
-                        "exercises": [
-                            {
-                                "name": "Cheek Lift Exercise",
-                                "description": "Strengthens and lifts the upper cheeks by smiling while raising the cheeks toward the eyes.",
-                                "reps": "12-15",
-                                "duration": "8 seconds hold per rep",
-                                "frequency_per_week": "5"
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
-    
     prompt_2 = f"""
 You are an AI assistant that creates **personalized, science-backed cheek improvement plans**.
 
@@ -377,37 +347,20 @@ Instructions:
         print("Calling Azure AI API for improvement plan...")
         print(f"Cheek metrics type: {type(cheek_metrics)}")
         print(f"User data type: {type(user_data)}")
-        print(f"DEBUG: About to create SystemMessage for improvement plan, prompt_2 type: {type(prompt_2)}")
-        
-        system_msg_2 = SystemMessage(prompt_2)
-        print("DEBUG: SystemMessage for improvement plan created successfully")
+        print(f"DEBUG: About to create UserMessage for improvement plan, prompt_2 type: {type(prompt_2)}")
         
         user_msg_2 = UserMessage([
             {
                 "type": "text",
-                "text": (
-                    "Generate a personalized, science-backed cheek improvement plan in JSON using the provided cheek metrics and user info. "
-                    "Include title, description, and steps with categories, goals, and evidence-based exercises or recommendations. "
-                    "Do not leave any fields blank. Only include scientifically supported methods. Output strictly valid JSON."
-                )
+                "text": prompt_2 + "\n\nGenerate a personalized, science-backed cheek improvement plan in JSON using the provided cheek metrics and user info. "
+                "Include title, description, and steps with categories, goals, and evidence-based exercises or recommendations. "
+                "Do not leave any fields blank. Only include scientifically supported methods. Output strictly valid JSON."
             }
         ])
         print("DEBUG: UserMessage for improvement plan created successfully")
         
         response_2 = client.complete(
-            messages=[
-                SystemMessage(prompt_2),
-                UserMessage([
-                    {
-                        "type": "text",
-                        "text": (
-                            "Generate a personalized, science-backed cheek improvement plan in JSON using the provided cheek metrics and user info. "
-                            "Include title, description, and steps with categories, goals, and evidence-based exercises or recommendations. "
-                            "Do not leave any fields blank. Only include scientifically supported methods. Output strictly valid JSON."
-                        )
-                    }
-                ])
-            ],
+            messages=[user_msg_2],
             temperature=0,
             top_p=1,
             model=MODEL
@@ -415,14 +368,8 @@ Instructions:
         
         # Handle the response more carefully
         print("Processing Azure AI response...")
-        try:
-            result = response_2.choices[0].message.content
-            print(f"Improvement plan AI response: {result[:200]}...")
-        except AttributeError as ae:
-            print(f"AttributeError accessing response content: {ae}")
-            print(f"Response type: {type(response_2)}")
-            print(f"Response: {response_2}")
-            raise Exception("Failed to access AI response content")
+        result = response_2.choices[0].message.content
+        print(f"Improvement plan AI response: {result[:200]}...")
         
         # Ensure we have a string to work with
         if not isinstance(result, str):
