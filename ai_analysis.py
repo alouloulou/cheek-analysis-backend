@@ -69,10 +69,13 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
     
     try:
         print("Calling Azure AI API...")
-        response = client.complete(
-            messages=[
-                SystemMessage(prompt),
-                UserMessage([
+        print(f"DEBUG: About to create SystemMessage with prompt type: {type(prompt)}")
+        print(f"DEBUG: About to create UserMessage with image_url type: {type(image_url)}")
+        
+        system_msg = SystemMessage(prompt)
+        print("DEBUG: SystemMessage created successfully")
+        
+        user_msg = UserMessage([
                     {
                         "type": "text",
                         "text": (
@@ -89,7 +92,10 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
                         }
                     }
                 ])
-            ],
+        print("DEBUG: UserMessage created successfully")
+        
+        response = client.complete(
+            messages=[system_msg, user_msg],
             temperature=0,  # deterministic output for metrics
             top_p=1,
             model=MODEL
