@@ -23,7 +23,8 @@ async def get_user_profile(user_id: str) -> Dict[str, Any]:
     try:
         print(f"Getting user profile for: {user_id}")
         # Get user profile from profiles table
-        response = supabase.table('profiles').select('*').eq('id', user_id).single().execute()
+        #response = supabase.table('profiles').select('*').eq('id', user_id).single().execute()
+        response = supabase.table('profiles').select('*').eq('id', user_id).maybe_single().execute()
         print(f"Supabase response: {response}")
         
         if response.data:
