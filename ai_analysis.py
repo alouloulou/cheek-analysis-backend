@@ -69,28 +69,29 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
     
     try:
         print("Calling Azure AI API...")
-        print(f"DEBUG: About to create UserMessage with prompt type: {type(prompt)}")
+        print(f"DEBUG: About to create SystemMessage with prompt type: {type(prompt)}")
         print(f"DEBUG: About to create UserMessage with image_url type: {(image_url)}")
         
-        user_msg = UserMessage([
-            {
-                "type": "text",
-                "text": prompt + "\n\nAnalyze this selfie/image and output the cheek metrics in JSON exactly as defined above. "
-                "You must compute real values for each metric based on the image analysis. "
-                "Do NOT leave zeros, nulls, or placeholders. "
-                "Output strictly JSON with the calculated numbers and percentages, no extra commentary."
-            },
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": image_url
-                }
-            }
-        ])
+        system_msg = SystemMessage(content=prompt)
+        print("DEBUG: SystemMessage created successfully")
+        
+        user_msg = UserMessage(
+                content=[
+                    TextContentItem(
+                        text=(
+                            "Analyze this selfie/image and output the cheek metrics in JSON exactly as defined in the system prompt. "
+                            "You must compute real values for each metric based on the image analysis. "
+                            "Do NOT leave zeros, nulls, or placeholders. "
+                            "Output strictly JSON with the calculated numbers and percentages, no extra commentary."
+                        )
+                    ),
+                    ImageContentItem(image_url={"url": image_url})
+                ]
+            )
         print("DEBUG: UserMessage created successfully")
         
         response = client.complete(
-            messages=[user_msg],
+            messages=[system_msg, user_msg],
             temperature=0,  # deterministic output for metrics
             top_p=1,
             model=MODEL
@@ -347,20 +348,19 @@ Instructions:
         print("Calling Azure AI API for improvement plan...")
         print(f"Cheek metrics type: {type(cheek_metrics)}")
         print(f"User data type: {type(user_data)}")
-        print(f"DEBUG: About to create UserMessage for improvement plan, prompt_2 type: {type(prompt_2)}")
+        print(f"DEBUG: About to create SystemMessage for improvement plan, prompt_2 type: {type(prompt_2)}")
         
-        user_msg_2 = UserMessage([
-            {
-                "type": "text",
-                "text": prompt_2 + "\n\nGenerate a personalized, science-backed cheek improvement plan in JSON using the provided cheek metrics and user info. "
-                "Include title, description, and steps with categories, goals, and evidence-based exercises or recommendations. "
-                "Do not leave any fields blank. Only include scientifically supported methods. Output strictly valid JSON."
-            }
-        ])
+        system_msg_2 = SystemMessage(content=prompt_2)
+        print("DEBUG: SystemMessage for improvement plan created successfully")
+        
+        user_msg_2 =UserMessage(content="Generate a personalized, science-backed cheek improvement plan in JSON using the provided cheek metrics and user info. "
+                    "Include title, description, and steps with categories, goals, and evidence-based exercises or recommendations. "
+                    "Do not leave any fields blank. Only include scientifically supported methods. Output strictly valid JSON.")
+        
         print("DEBUG: UserMessage for improvement plan created successfully")
         
         response_2 = client.complete(
-            messages=[user_msg_2],
+            messages=[system_msg_2, user_msg_2],
             temperature=0,
             top_p=1,
             model=MODEL
