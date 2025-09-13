@@ -6,3 +6,8 @@ azure-core==1.35.0
 supabase==2.5.0
 python-dotenv==1.0.0
 Pillow==10.1.0
+
+# Google Play Developer API for server-side purchase verification
+google-api-python-client==2.147.0
+google-auth==2.34.0
+google-auth-httplib2==0.2.0
