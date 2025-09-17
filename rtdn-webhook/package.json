@@ -1,0 +1,21 @@
+{
+  "name": "cheek-rtdn-webhook",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.46.1",
+    "express": "^4.19.2",
+    "googleapis": "^130.0.0",
+    "google-auth-library": "^9.14.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.4.5"
+  }
+}
