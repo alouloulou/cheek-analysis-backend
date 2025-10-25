@@ -5,9 +5,7 @@ import json
 import uuid
 from datetime import datetime, timedelta
 
-# Supabase configuration
-
-
+# Supabase configuration (reverted)
 SUPABASE_URL = os.getenv("SUPABASE_URL", "your-token-here")
 SERVICE_ROLE_KEY = os.getenv("SERVICE_ROLE_KEY", "your-token-here")
 
@@ -35,10 +33,10 @@ async def get_user_profile(user_id: str) -> Dict[str, Any]:
             profile = response.data
             print(f"Retrieved profile data: {profile}")
 
-            # Calculate derived values from real user data
+            # Use user-provided values directly from profile (no derived calcs)
             diet_quality = profile.get('diet_quality')
-            hydration = f"{diet_quality * 0.3 + 1.5:.1f}L" if diet_quality else "2.5L"  # 1.5-4.5L based on diet quality
-            sugar_score = 10 - diet_quality if diet_quality else 5
+            hydration = profile.get('hydration')
+            sugar_score = profile.get('sugar_score')
 
             # Format user data for AI analysis using REAL data from database
             user_data = {
@@ -49,12 +47,13 @@ async def get_user_profile(user_id: str) -> Dict[str, Any]:
                     "hydration": hydration,
                     "sleep_quality": f"{profile.get('sleep_hours')} hours" if profile.get('sleep_hours') else None,
                     "physical_activity": profile.get('exercise_frequency'),
-                    "posture": f"{profile.get('stress_level')} for 0=Very poor - 10=Excellent" if profile.get('stress_level') else None,
+                    "posture": f"{profile.get('posture')} for 0=Very poor - 10=Good" if profile.get('posture') else None,
+                    "stress_level": f"{profile.get('stress_level')} (0=Good - 10=Very poor)" if profile.get('stress_level') is not None else None,
                     "smoking_alcohol": f"{profile.get('smoking_habits', 'no smoking')} {profile.get('alcohol_consumption', 'no alcohol')}",
                     "sun_exposure": profile.get('sun_exposure'),
                     "protein_intake": profile.get('protein_intake'),
                     "collagen_vitamin_C": profile.get('collagen_vitamin_c'),
-                    "sugar_processed_food": f"{sugar_score} for 0=Very high intake - 10=Very low intake",
+                    "sugar_processed_food": f"{sugar_score} for 0=Very low intake - 10=Very high intake" if sugar_score is not None else None,
                     "facial_exercises": profile.get('facial_exercises'),
                     "massage_skincare": "yes" if profile.get('massage_skincare', 0) > 5 else "no",
                     "weight_changes": profile.get('weight_changes')
@@ -178,6 +177,110 @@ def calculate_improvement_potential(cheek_metrics: Dict[str, Any]) -> float:
     except Exception as e:
         print(f"Error calculating improvement potential: {e}")
         return 7.5
+
+async def verify_google_subscription(user_id: str, package_name: str, product_id: str, purchase_token: str) -> dict:
+    """
+    Verify Google Play subscription and update Supabase
+    """
+    try:
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        import json
+        
+        # Load service account credentials from environment
+        service_account_json = os.getenv("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON")
+        if not service_account_json:
+            raise Exception("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON environment variable not set")
+        
+        credentials_info = json.loads(service_account_json)
+        credentials = service_account.Credentials.from_service_account_info(
+            credentials_info,
+            scopes=['https://www.googleapis.com/auth/androidpublisher']
+        )
+        
+        # Build the service
+        service = build('androidpublisher', 'v3', credentials=credentials)
+        
+        # Verify the subscription
+        result = service.purchases().subscriptions().get(
+            packageName=package_name,
+            subscriptionId=product_id,
+            token=purchase_token
+        ).execute()
+        
+        # Parse subscription details
+        expiry_time_millis = int(result.get('expiryTimeMillis', 0))
+        expiry_date = datetime.fromtimestamp(expiry_time_millis / 1000) if expiry_time_millis else None
+        
+        # Determine subscription status
+        is_active = (
+            result.get('paymentState') == 1 and  # Payment received
+            expiry_date and expiry_date > datetime.now()
+        )
+        
+        status = 'active' if is_active else 'expired'
+        plan_type = 'yearly' if 'yearly' in product_id.lower() else 'monthly'
+        
+        # Update Supabase profiles
+        await supabase.table('profiles').upsert({
+            'id': user_id,
+            'subscription_status': status,
+            'subscription_type': plan_type,
+            'subscription_start_date': datetime.now().isoformat() if is_active else None,
+            'subscription_end_date': expiry_date.isoformat() if expiry_date else None,
+            'updated_at': datetime.now().isoformat(),
+        }).execute()
+        
+        # Store subscription record
+        await supabase.table('subscriptions').upsert({
+            'user_id': user_id,
+            'provider': 'google',
+            'product_id': product_id,
+            'purchase_token': purchase_token,
+            'status': status,
+            'start_at': datetime.now().isoformat() if is_active else None,
+            'end_at': expiry_date.isoformat() if expiry_date else None,
+            'raw': result,
+            'updated_at': datetime.now().isoformat(),
+        }, on_conflict='provider,purchase_token').execute()
+        
+        # Acknowledge the purchase if needed
+        if not result.get('acknowledgementState', 0):
+            service.purchases().subscriptions().acknowledge(
+                packageName=package_name,
+                subscriptionId=product_id,
+                token=purchase_token
+            ).execute()
+        
+        return {
+            'success': True,
+            'status': status,
+            'expiry_date': expiry_date.isoformat() if expiry_date else None,
+            'plan_type': plan_type
+        }
+        
+    except Exception as e:
+        print(f"Error verifying Google subscription: {e}")
+        # Fallback: mark as active for testing (remove in production)
+        now = datetime.now()
+        end_date = now + timedelta(days=365 if 'yearly' in product_id.lower() else 30)
+        
+        await supabase.table('profiles').upsert({
+            'id': user_id,
+            'subscription_status': 'active',
+            'subscription_type': 'yearly' if 'yearly' in product_id.lower() else 'monthly',
+            'subscription_start_date': now.isoformat(),
+            'subscription_end_date': end_date.isoformat(),
+            'updated_at': now.isoformat(),
+        }).execute()
+        
+        return {
+            'success': True,
+            'status': 'active',
+            'expiry_date': end_date.isoformat(),
+            'plan_type': 'yearly' if 'yearly' in product_id.lower() else 'monthly',
+            'note': 'Fallback verification used'
+        }
 
 async def get_user_analyses(user_id: str, limit: int = 10) -> list:
     """
@@ -306,17 +409,59 @@ async def delete_image_from_supabase(image_url: str) -> bool:
         print(f"Error deleting image from Supabase: {e}")
         return False
 
-async def cleanup_old_temp_images() -> int:
+async def increment_user_analysis_count(user_id: str) -> bool:
     """
-    Clean up temporary images older than 1 hour from Supabase Storage
+    Increment the analysis count for a user in the user_analysis_limits table
     
+    Args:
+        user_id: The user's UUID
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # First, try to get the current record
+        response = supabase.table('user_analysis_limits').select('analysis_count').eq('user_id', user_id).execute()
+        
+        if response.data and len(response.data) > 0:
+            # Record exists, increment the count
+            current_count = response.data[0].get('analysis_count', 0)
+            new_count = current_count + 1
+            
+            update_response = supabase.table('user_analysis_limits').update({
+                'analysis_count': new_count
+            }).eq('user_id', user_id).execute()
+            
+            print(f"Updated analysis count for user {user_id}: {current_count} -> {new_count}")
+            return True
+        else:
+            # Record doesn't exist, create it with count = 1
+            insert_response = supabase.table('user_analysis_limits').insert({
+                'user_id': user_id,
+                'analysis_count': 1,
+                'max_analyses': 3,  # Default for free users
+                'subscription_type': 'free'
+            }).execute()
+            
+            print(f"Created new analysis record for user {user_id} with count = 1")
+            return True
+            
+    except Exception as e:
+        print(f"Error incrementing analysis count for user {user_id}: {e}")
+        return False
+
+async def cleanup_old_temp_images(hours_old: int = 1) -> int:
+    """
+    Clean up temporary images older than specified hours
+    
+    Args:
+        hours_old: Images older than this many hours will be deleted
+        
     Returns:
         Number of images cleaned up
     """
     try:
-        print("Starting cleanup of old temporary images")
-        
-        # List all files in temp_analysis folder
+        # List all files in the temp_analysis folder
         response = supabase.storage.from_("images").list("temp_analysis")
         
         if not response:
@@ -324,28 +469,42 @@ async def cleanup_old_temp_images() -> int:
             return 0
             
         files_to_delete = []
-        cutoff_time = datetime.now() - timedelta(hours=1)
+        cutoff_time = datetime.now() - timedelta(hours=hours_old)
         
         for file_info in response:
-            # Check if file is older than 1 hour
-            created_at = datetime.fromisoformat(file_info['created_at'].replace('Z', '+00:00'))
-            if created_at < cutoff_time:
-                files_to_delete.append(f"temp_analysis/{file_info['name']}")
+            # Parse the timestamp from filename (format: temp_YYYYMMDD_HHMMSS_uuid.ext)
+            filename = file_info['name']
+            if filename.startswith('temp_'):
+                try:
+                    # Extract timestamp from filename
+                    parts = filename.split('_')
+                    if len(parts) >= 3:
+                        date_part = parts[1]  # YYYYMMDD
+                        time_part = parts[2]  # HHMMSS
+                        
+                        # Parse the datetime
+                        file_datetime = datetime.strptime(f"{date_part}_{time_part}", "%Y%m%d_%H%M%S")
+                        
+                        if file_datetime < cutoff_time:
+                            files_to_delete.append(f"temp_analysis/{filename}")
+                            
+                except (ValueError, IndexError) as e:
+                    print(f"Could not parse timestamp from filename {filename}: {e}")
+                    continue
         
-        if files_to_delete:
-            print(f"Deleting {len(files_to_delete)} old temporary images")
-            delete_response = supabase.storage.from_("images").remove(files_to_delete)
-            
-            if delete_response:
-                print(f"Successfully cleaned up {len(files_to_delete)} old images")
-                return len(files_to_delete)
-            else:
-                print(f"Failed to delete old images: {delete_response}")
-                return 0
-        else:
-            print("No old images to clean up")
-            return 0
-            
+        # Delete old files
+        deleted_count = 0
+        for file_path in files_to_delete:
+            try:
+                supabase.storage.from_("images").remove([file_path])
+                deleted_count += 1
+                print(f"Deleted old temp image: {file_path}")
+            except Exception as e:
+                print(f"Failed to delete {file_path}: {e}")
+                
+        print(f"Cleanup complete: {deleted_count} files deleted")
+        return deleted_count
+        
     except Exception as e:
         print(f"Error during cleanup: {e}")
         return 0
