@@ -7,5 +7,5 @@ services:
     envVars:
       - key: PORT
         value: 8000
-      - key: AZURE_AI_TOKEN
+      - key: OPENAI_API_KEY
         sync: false  # This will be set manually in Render dashboard
