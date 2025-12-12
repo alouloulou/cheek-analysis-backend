@@ -1,28 +1,23 @@
 import json
 import os
+import re
 from typing import Dict, Any
-from azure.ai.inference import ChatCompletionsClient
-from azure.ai.inference.models import SystemMessage, UserMessage, TextContentItem, ImageContentItem, ImageUrl
-from azure.core.credentials import AzureKeyCredential
+from openai import OpenAI
 
-# Azure AI configuration
-ENDPOINT = "https://models.github.ai/inference"
-MODEL = "openai/gpt-4.1"
-TOKEN = os.getenv("AZURE_AI_TOKEN", "your-token-here")  # Set this in environment
+# OpenAI configuration
+MODEL = "gpt-5-mini"  # Using GPT-5 mini for cost efficiency
+API_KEY = os.getenv("OPENAI_API_KEY", "your-api-key-here")
 
 # Debug logging for environment variables
-print(f"DEBUG: AZURE_AI_TOKEN exists: {os.getenv('AZURE_AI_TOKEN') is not None}")
-print(f"DEBUG: TOKEN value starts with: {TOKEN[:10] if TOKEN != 'your-token-here' else 'DEFAULT_FALLBACK'}")
-print(f"DEBUG: All environment variables: {list(os.environ.keys())}")
+print(f"DEBUG: OPENAI_API_KEY exists: {os.getenv('OPENAI_API_KEY') is not None}")
+print(f"DEBUG: API_KEY value starts with: {API_KEY[:10] if API_KEY != 'your-api-key-here' else 'DEFAULT_FALLBACK'}")
 
-client = ChatCompletionsClient(
-    endpoint=ENDPOINT,
-    credential=AzureKeyCredential(TOKEN),
-)
+# Create OpenAI client
+client = OpenAI(api_key=API_KEY)
 
 async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
     """
-    Analyze cheek metrics from image using Azure AI
+    Analyze cheek metrics from image using OpenAI GPT-5 mini
 
     Args:
         image_url: URL to the temporary image
@@ -33,9 +28,9 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
 
     print(f"Starting cheek analysis for image: {image_url}")
 
-    # Check if Azure AI token is available
-    if TOKEN == "your-token-here":
-        print("WARNING: Azure AI token not set, using fallback metrics")
+    # Check if OpenAI API key is available
+    if API_KEY == "your-api-key-here":
+        print("WARNING: OpenAI API key not set, using fallback metrics")
         return {
             "cheek_lift": 6.2,
             "cheek_fullness": 7.1,
@@ -45,7 +40,7 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
             "fat_vs_muscle_contribution": "60% muscle / 40% fat"
         }
 
-    prompt = (
+    system_prompt = (
         "You are a facial aesthetics analysis AI. Analyze the provided selfie image and output scientifically-informed metrics "
         "related specifically to the cheeks. Metrics must be quantitative or scaled wherever possible, following approaches "
         "used in peer-reviewed research and validated facial scales. Use facial landmarks, volume estimation, and relative "
@@ -67,34 +62,30 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
         "4. Output only JSON with real computed numbers, no placeholder values, no extra commentary."
     )
     
+    user_prompt = (
+        "Analyze this selfie/image and output the cheek metrics in JSON exactly as defined in the system prompt. "
+        "You must compute real values for each metric based on the image analysis. "
+        "Do NOT leave zeros, nulls, or placeholders. "
+        "Output strictly JSON with the calculated numbers and percentages, no extra commentary."
+    )
+    
     try:
-        print("Calling Azure AI API...")
-        print(f"DEBUG: About to create SystemMessage with prompt type: {type(prompt)}")
-        print(f"DEBUG: About to create UserMessage with image_url type: {(image_url)}")
+        print("Calling OpenAI API...")
         
-        system_msg = SystemMessage(content=prompt)
-        print("DEBUG: SystemMessage created successfully")
-        
-        user_msg = UserMessage(
-                content=[
-                    TextContentItem(
-                        text=(
-                            "Analyze this selfie/image and output the cheek metrics in JSON exactly as defined in the system prompt. "
-                            "You must compute real values for each metric based on the image analysis. "
-                            "Do NOT leave zeros, nulls, or placeholders. "
-                            "Output strictly JSON with the calculated numbers and percentages, no extra commentary."
-                        )
-                    ),
-                    ImageContentItem(image_url={"url": image_url})
-                ]
-            )
-        print("DEBUG: UserMessage created successfully")
-        
-        response = client.complete(
-            messages=[system_msg, user_msg],
-            temperature=0,  # deterministic output for metrics
-            top_p=1,
-            model=MODEL
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_prompt},
+                        {"type": "image_url", "image_url": {"url": image_url}}
+                    ]
+                }
+            ],
+            temperature=0,
+            top_p=1
         )
 
         result = response.choices[0].message.content
@@ -117,7 +108,6 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
         except json.JSONDecodeError as je:
             print(f"JSON decode error: {je}")
             # If response isn't valid JSON, try to extract JSON from text
-            import re
             json_match = re.search(r'\{.*\}', result, re.DOTALL)
             if json_match:
                 try:
@@ -164,9 +154,9 @@ async def generate_improvement_plan(cheek_metrics: Dict[str, Any], user_data: Di
 
     print("Starting improvement plan generation...")
 
-    # Check if Azure AI token is available
-    if TOKEN == "your-token-here":
-        print("WARNING: Azure AI token not set, using fallback plan")
+    # Check if OpenAI API key is available
+    if API_KEY == "your-api-key-here":
+        print("WARNING: OpenAI API key not set, using fallback plan")
         return {
             "cheek_improvement_plan": {
                 "title": "Cheek Improvement Plan",
@@ -195,7 +185,7 @@ async def generate_improvement_plan(cheek_metrics: Dict[str, Any], user_data: Di
     print('*************   cheek_metrics_str', cheek_metrics_str)
     print('*************user_data_str', user_data_str)
 
-    prompt_2 = f"""
+    system_prompt = f"""
 You are an AI assistant that creates **personalized, science-backed cheek improvement plans**.
 
 Input:
@@ -344,31 +334,30 @@ Instructions:
 5. Output **only valid JSON**, no extra text or explanation.
 """
     
+    user_prompt = (
+        "Generate a personalized, science-backed cheek improvement plan in JSON using the provided cheek metrics and user info. "
+        "Include title, description, and steps with categories, goals, and evidence-based exercises or recommendations. "
+        "Do not leave any fields blank. Only include scientifically supported methods. Output strictly valid JSON."
+    )
+    
     try:
-        print("Calling Azure AI API for improvement plan...")
+        print("Calling OpenAI API for improvement plan...")
         print(f"Cheek metrics type: {type(cheek_metrics)}")
         print(f"User data type: {type(user_data)}")
-        print(f"DEBUG: About to create SystemMessage for improvement plan, prompt_2 type: {type(prompt_2)}")
         
-        system_msg_2 = SystemMessage(content=prompt_2)
-        print("DEBUG: SystemMessage for improvement plan created successfully")
-        
-        user_msg_2 =UserMessage(content="Generate a personalized, science-backed cheek improvement plan in JSON using the provided cheek metrics and user info. "
-                    "Include title, description, and steps with categories, goals, and evidence-based exercises or recommendations. "
-                    "Do not leave any fields blank. Only include scientifically supported methods. Output strictly valid JSON.")
-        
-        print("DEBUG: UserMessage for improvement plan created successfully")
-        
-        response_2 = client.complete(
-            messages=[system_msg_2, user_msg_2],
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
             temperature=0,
-            top_p=1,
-            model=MODEL
+            top_p=1
         )
         
-        # Handle the response more carefully
-        print("Processing Azure AI response...")
-        result = response_2.choices[0].message.content
+        # Handle the response
+        print("Processing OpenAI response...")
+        result = response.choices[0].message.content
         print(f"Improvement plan AI response: {result[:200]}...")
         
         # Ensure we have a string to work with
@@ -388,7 +377,6 @@ Instructions:
         except json.JSONDecodeError as je:
             print(f"Improvement plan JSON decode error: {je}")
             # If response isn't valid JSON, try to extract JSON from text
-            import re
             json_match = re.search(r'\{.*\}', result, re.DOTALL)
             if json_match:
                 try:
