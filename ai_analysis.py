@@ -83,9 +83,7 @@ async def analyze_cheek_metrics(image_url: str) -> Dict[str, Any]:
                         {"type": "image_url", "image_url": {"url": image_url}}
                     ]
                 }
-            ],
-            temperature=0,
-            top_p=1
+            ]
         )
 
         result = response.choices[0].message.content
@@ -350,9 +348,7 @@ Instructions:
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
-            ],
-            temperature=0,
-            top_p=1
+            ]
         )
         
         # Handle the response
